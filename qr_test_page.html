@@ -40,7 +40,7 @@
     (function setDefaultBase(){
       const here = new URL(window.location.href);
       // If this page is named qr-test.html next to index.html, assume index.html sibling
-      const base = new URL('./index.html', here).href;
+      const base = new URL('./bingo_qr_board.html', here).href;
       document.getElementById('baseUrl').value = base;
     })();
 
