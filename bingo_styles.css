@@ -1,0 +1,29 @@
+body {
+	font-family: sans-serif;
+	text-align: center;
+	margin: 0;
+	padding: 1em;
+}
+
+#board {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	grid-gap: 0.5em;
+	max-width: 500px;
+	margin: 0 auto;
+}
+
+.square {
+	aspect-ratio: 1;
+	background: #eee;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 2em;
+	border-radius: 10px;
+	user-select: none;
+}
+
+.filled {
+	background: #90ee90;
+}
