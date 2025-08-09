@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Community Bingo — QR Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; }
+    h1 { font-size: 1.25rem; margin: 0 0 12px; }
+    .controls { display: grid; gap: 8px; margin-bottom: 16px; }
+    label { font-size: .9rem; color: #333; }
+    input, textarea, button { width: 100%; padding: 10px; font: inherit; border: 1px solid #ccc; border-radius: 8px; }
+    button { cursor: pointer; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    .card { border: 1px solid #eee; border-radius: 12px; padding: 10px; display: grid; gap: 6px; align-content: start; }
+    .url { font-size: .75rem; word-break: break-all; color: #444; }
+    .title { font-weight: 600; font-size: .9rem; }
+  </style>
+  <!-- Lightweight QR generator (pure JS, no deps) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-MVbS1wKf0aYpW7Qx3pQZ7FQDiqzv0zA2n2U1s8+q4sYbbh7M+9ZK8r3Hc8e5kqkQ9a3z9i5eX9rQ0zK0b8+0/A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+  <h1>QR Test — Community Bingo</h1>
+  <div class="controls">
+    <label>
+      Base URL (where your bingo board lives)
+      <input id="baseUrl" />
+    </label>
+    <label>
+      Fill IDs (comma-separated, optional; if empty, will load board_squares.json and generate one QR per index)
+      <textarea id="ids" rows="3" placeholder="e.g., 0,1,2,5,8"></textarea>
+    </label>
+    <button id="gen">Generate QRs</button>
+  </div>
+
+  <div class="grid" id="qrGrid"></div>
+
+  <script>
+    // Default base URL to current origin plus a guess at /index.html or current path
+    (function setDefaultBase(){
+      const here = new URL(window.location.href);
+      // If this page is named qr-test.html next to index.html, assume index.html sibling
+      const base = new URL('./index.html', here).href;
+      document.getElementById('baseUrl').value = base;
+    })();
+
+    async function getAllIndices() {
+      try {
+        const res = await fetch('board_squares.json');
+        if (!res.ok) throw new Error('Failed to load board_squares.json');
+        const arr = await res.json();
+        return Array.from({length: arr.length}, (_, i) => i);
+      } catch (e) {
+        alert('Could not load board_squares.json. Enter IDs manually.');
+        return [];
+      }
+    }
+
+    function makeQR(container, text) {
+      // Clear
+      container.innerHTML = '';
+      new QRCode(container, {
+        text,
+        width: 128,
+        height: 128,
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    function buildUrl(base, ids) {
+      const url = new URL(base);
+      // support multiple IDs in one QR via comma
+      url.searchParams.set('fill', ids.join(','));
+      return url.toString();
+    }
+
+    document.getElementById('gen').addEventListener('click', async () => {
+      const base = document.getElementById('baseUrl').value.trim();
+      const raw = document.getElementById('ids').value.trim();
+      const grid = document.getElementById('qrGrid');
+      grid.innerHTML = '';
+
+      let idsList = [];
+      if (raw) {
+        idsList = raw.split(',').map(s => s.trim()).filter(Boolean).map(Number).filter(n => Number.isInteger(n) && n >= 0);
+      } else {
+        idsList = await getAllIndices();
+      }
+
+      if (!base) { alert('Enter a base URL'); return; }
+      if (!idsList.length) { alert('No IDs to render'); return; }
+
+      // Render one QR per ID by default
+      idsList.forEach((id) => {
+        const url = buildUrl(base, [id]);
+        const card = document.createElement('div');
+        card.className = 'card';
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = `fill=${id}`;
+        const qr = document.createElement('div');
+        const u = document.createElement('div');
+        u.className = 'url';
+        u.textContent = url;
+        card.appendChild(title);
+        card.appendChild(qr);
+        card.appendChild(u);
+        grid.appendChild(card);
+        makeQR(qr, url);
+      });
+    });
+  </script>
+</body>
+</html>
