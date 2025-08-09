@@ -14,9 +14,12 @@
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
     .card { border: 1px solid #eee; border-radius: 12px; padding: 10px; display: grid; gap: 6px; align-content: start; }
     .url { font-size: .75rem; word-break: break-all; color: #444; }
-    .title { font-weight: 600; font-size: .9rem; }
+    .title { font-weight: 600; font-size: .9rem; text-align: center; }
+    .label-above { font-size: .85rem; font-weight: 500; text-align: center; margin-bottom: 4px; }
+  .element { font-size: 2rem; text-align: center; }
+    .qrBox { position: relative; width: 128px; height: 128px; margin: 0 auto; }
+    .qrOverlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: white; font-size: 1.5rem; box-shadow: 0 0 0 2px rgba(0,0,0,0.05) inset; }
   </style>
-  <!-- Lightweight QR generator (pure JS, no deps) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
@@ -30,34 +33,48 @@
       Fill IDs (comma-separated, optional; if empty, will load board_squares.json and generate one QR per index)
       <textarea id="ids" rows="3" placeholder="e.g., 0,1,2,5,8"></textarea>
     </label>
+    <label style="display:flex; gap:8px; align-items:center;">
+      <input type="checkbox" id="overlay" />
+      Overlay element inside QR (experimental)
+    </label>
     <button id="gen">Generate QRs</button>
   </div>
 
   <div class="grid" id="qrGrid"></div>
 
   <script>
-    // Default base URL to current origin plus a guess at /index.html or current path
+    let ITEMS = null; // content of board_squares.json (array)
+
     (function setDefaultBase(){
       const here = new URL(window.location.href);
-      // If this page is named qr-test.html next to index.html, assume index.html sibling
-      const base = new URL('./bingo_qr_board.html', here).href;
+      const base = new URL('./index.html', here).href;
       document.getElementById('baseUrl').value = base;
     })();
 
-    async function getAllIndices() {
+    async function loadItems() {
+      if (ITEMS) return ITEMS;
       try {
         const res = await fetch('board_squares.json');
         if (!res.ok) throw new Error('Failed to load board_squares.json');
-        const arr = await res.json();
-        return Array.from({length: arr.length}, (_, i) => i);
+        ITEMS = await res.json();
+        return ITEMS;
       } catch (e) {
+        ITEMS = null;
+        return null;
+      }
+    }
+
+    async function getAllIndices() {
+      const arr = await loadItems();
+      if (Array.isArray(arr)) {
+        return Array.from({length: arr.length}, (_, i) => i);
+      } else {
         alert('Could not load board_squares.json. Enter IDs manually.');
         return [];
       }
     }
 
     function makeQR(container, text) {
-      // Clear
       container.innerHTML = '';
       new QRCode(container, {
         text,
@@ -69,14 +86,21 @@
 
     function buildUrl(base, ids) {
       const url = new URL(base);
-      // support multiple IDs in one QR via comma
       url.searchParams.set('fill', ids.join(','));
       return url.toString();
+    }
+
+    function overlayElement(qrContainer, label) {
+      const overlay = document.createElement('div');
+      overlay.className = 'qrOverlay';
+      overlay.textContent = label;
+      qrContainer.appendChild(overlay);
     }
 
     document.getElementById('gen').addEventListener('click', async () => {
       const base = document.getElementById('baseUrl').value.trim();
       const raw = document.getElementById('ids').value.trim();
+      const doOverlay = document.getElementById('overlay').checked;
       const grid = document.getElementById('qrGrid');
       grid.innerHTML = '';
 
@@ -90,23 +114,39 @@
       if (!base) { alert('Enter a base URL'); return; }
       if (!idsList.length) { alert('No IDs to render'); return; }
 
-      // Render one QR per ID by default
+      const items = await loadItems();
+
       idsList.forEach((id) => {
         const url = buildUrl(base, [id]);
         const card = document.createElement('div');
         card.className = 'card';
-        const title = document.createElement('div');
-        title.className = 'title';
-        title.textContent = `fill=${id}`;
+
+        const elementLabel = Array.isArray(items) && items[id] != null ? String(items[id]) : `ID ${id}`;
+
+        const elementDiv = document.createElement('div');
+        elementDiv.className = 'element';
+        elementDiv.textContent = elementLabel;
+        card.appendChild(elementDiv);
+
+        const qrBox = document.createElement('div');
+        qrBox.className = 'qrBox';
         const qr = document.createElement('div');
+        qrBox.appendChild(qr);
+        card.appendChild(qrBox);
+
         const u = document.createElement('div');
         u.className = 'url';
         u.textContent = url;
-        card.appendChild(title);
-        card.appendChild(qr);
         card.appendChild(u);
-        grid.appendChild(card);
+
+        document.getElementById('qrGrid').appendChild(card);
+
         makeQR(qr, url);
+
+        if (doOverlay) {
+          overlayElement(qrBox, elementLabel);
+          elementDiv.style.display = 'none';
+        }
       });
     });
   </script>
